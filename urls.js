@@ -1,29 +1,42 @@
-const fs = require("fs");
+const fs = require("fs/promises");
+const process = require("process");
+const axios = require("axios");
 
-function reading(path) {
-  fs.readFile(path, "utf8", function (err, data) {
-    if (err) {
-      // handle possible error
-      console.log(`Error reading ${path}: ${err}`);
-      // kill the process and tell the shell it errored
-      process.exit(1);
-    }
-    // otherwise success
-    console.log(`file contents: ${data}`);
-  });
+const path = process.argv[2];
 
-  console.log("reading file");
-  // file won't have been read yet at this point
-}
-
-reading("urls.txt");
-
-async function saveHtml(url) {
+async function readUrlsFromFile(path) {
   try {
-    let resp = await axios.get(url);
-    console.log(resp.data);
+    const data = await fs.readFile(path, "utf-8");
+    return data.trim().split("\n");
   } catch (err) {
-    console.error(`Error fetching ${url}: ${err}`);
+    console.error(`Error reading ${path}: ${err.message}`);
     process.exit(1);
   }
 }
+
+async function fetchAndSaveHTML(inputUrl) {
+  try {
+    let parsedUrl = new URL(inputUrl);
+    let domainName = parsedUrl.hostname;
+    let resp = await axios.get(inputUrl);
+    await fs.writeFile(domainName, resp.data);
+    console.log(`Wrote to ${domainName}`);
+  } catch (err) {
+    console.log(`Couldn't download ${inputUrl}`);
+  }
+}
+
+async function main() {
+  try {
+    const urls = await readUrlsFromFile(path);
+
+    for (const url of urls) {
+      await fetchAndSaveHTML(url);
+    }
+  } catch (error) {
+    console.error(`Error: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+main();
